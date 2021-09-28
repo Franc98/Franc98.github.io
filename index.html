@@ -399,12 +399,21 @@
 
             *********************************************************************************
             */
-           // pasos para las rotaciones
+            // pasos para las rotaciones
+            var pasoRotacionTierraEje = 2*Math.PI;
+            var pasoRotacionTierraSol = pasoRotacionTierraEje/8;
+            var pasoRotacionLunaTierra = pasoRotacionTierraEje/4;
+            var pasoRotacionIssTierra = pasoRotacionTierraEje/4;
+            /*
+            // valores más representativos pero se ven mal
+            // pasos para las rotaciones
             var factorVelocidad = 50;
             var pasoRotacionTierraEje = factorVelocidad*2*Math.PI;
             var pasoRotacionTierraSol = pasoRotacionTierraEje/365;
             var pasoRotacionLunaTierra = pasoRotacionTierraEje/28;
             var pasoRotacionIssTierra = pasoRotacionTierraEje/10;
+            */
+            
 
             // posiciones relativas iniciales de los objetos
             var posTierraSol = [60,0,0];
