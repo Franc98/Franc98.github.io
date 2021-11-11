@@ -397,8 +397,7 @@
                     mat4.multiply(this.matrizRotacion,this.matrizAuxiliar,this.matrizRotacion);
                     //mat4.rotate(this.matrizModelado,this.matrizModelado,angulo,this.vecAdelanteOriginal);
                     //mat4.multiply(this.matrizRotacion,this.matrizRotacion,this.matrizModelado);
-
-
+                    /*
                     var sin = Math.sin(angulo);
                     var cos = Math.cos(angulo);
 
@@ -412,6 +411,13 @@
                     vec3.normalize(this.vecLateral,this.vecLateral);
                     vec3.copy(this.vecArriba,this.vecArribaAux);
                     vec3.normalize(this.vecArriba,this.vecArriba);
+                    */
+                    
+                    vec3.transformMat4(this.vecLateral,this.vecLateral,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecLateral,this.vecLateral);
+                    vec3.transformMat4(this.vecArriba,this.vecArriba,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecArriba,this.vecArriba);
+                    
                 }
 
                 girarAnguloGuiniada(angulo)
@@ -421,7 +427,7 @@
                     mat4.multiply(this.matrizRotacion,this.matrizAuxiliar,this.matrizRotacion);
                     //mat4.rotate(this.matrizAuxiliar,this.matrizAuxiliar,angulo,this.vecArribaOriginal);
                     //mat4.multiply(this.matrizRotacion,this.matrizRotacion,this.matrizAuxiliar);
-                    
+                    /*
                     var sin = Math.sin(angulo);
                     var cos = Math.cos(angulo);
 
@@ -435,6 +441,13 @@
                     vec3.normalize(this.vecLateral,this.vecLateral);
                     vec3.copy(this.vecAdelante,this.vecAdelanteAux);
                     vec3.normalize(this.vecAdelante,this.vecAdelante);
+                    */
+                    
+                    vec3.transformMat4(this.vecLateral,this.vecLateral,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecLateral,this.vecLateral);
+                    vec3.transformMat4(this.vecAdelante,this.vecAdelante,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecAdelante,this.vecAdelante);
+                    
                     
                 }
 
@@ -445,7 +458,8 @@
                     mat4.multiply(this.matrizRotacion,this.matrizAuxiliar,this.matrizRotacion);
                     //mat4.rotate(this.matrizAuxiliar,this.matrizAuxiliar,angulo,this.vecLateralOriginal);
                     //mat4.multiply(this.matrizRotacion,this.matrizRotacion,this.matrizAuxiliar);
-
+                    
+                    /*
                     var sin = Math.sin(angulo);
                     var cos = Math.cos(angulo);
                     
@@ -459,6 +473,12 @@
                     vec3.normalize(this.vecArriba,this.vecArriba);
                     vec3.copy(this.vecAdelante,this.vecAdelanteAux);
                     vec3.normalize(this.vecAdelante,this.vecAdelante);
+                    */
+                    
+                    vec3.transformMat4(this.vecArriba,this.vecArriba,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecArriba,this.vecArriba);
+                    vec3.transformMat4(this.vecAdelante,this.vecAdelante,this.matrizAuxiliar);
+                    //vec3.normalize(this.vecAdelante,this.vecAdelante);  
                     
                 }
             }
@@ -524,8 +544,6 @@
 
                     setupWebGL();
                     initShaders();
-                    setupBuffers();
-                    probarSuperficieDeBarrido();
                     setupVertexShaderMatrix();
                     inicializarObjetos();
                     tick();   
@@ -599,108 +617,6 @@
                 return shader;
             }
             
-            function getPos(alfa,beta){
-
-                var r=2;
-                var nx=Math.sin(beta)*Math.sin(alfa);
-                var ny=Math.sin(beta)*Math.cos(alfa);
-                var nz=Math.cos(beta);
-
-
-                var g=beta%0.5;
-                var h=alfa%1;
-                var f=1;
-
-                if (g<0.25) f=0.95;
-                if (h<0.5) f=f*0.95;
-                
-                var x=nx*r*f;
-                var y=ny*r*f;
-                var z=nz*r*f;
-
-                return [x,y,z];
-            }
-
-            function getNrm(alfa,beta){
-                var p=getPos(alfa,beta);
-                var v=vec3.create();
-                vec3.normalize(v,p);
-
-                var delta=0.05;
-                var p1=getPos(alfa,beta);
-                var p2=getPos(alfa,beta+delta);
-                var p3=getPos(alfa+delta,beta);
-
-                var v1=vec3.fromValues(p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2]);
-                var v2=vec3.fromValues(p3[0]-p1[0],p3[1]-p1[1],p3[2]-p1[2]);
-
-                vec3.normalize(v1,v1);
-                vec3.normalize(v2,v2);
-                
-                var n=vec3.create();
-                vec3.cross(n,v1,v2);
-                vec3.scale(n,n,-1);
-                return n;
-            }
-
-            function setupBuffers()
-            {
-                var pos=[];
-                var normal=[];
-                var r=2;
-                var rows=128;
-                var cols=256;
-
-                for (var i=0;i<rows;i++){
-                    for (var j=0;j<cols;j++){
-
-                        var alfa=j/(cols-1)*Math.PI*2;
-                        var beta=(0.1+i/(rows-1)*0.8)*Math.PI;
-
-                        var p=getPos(alfa,beta);
-
-                        pos.push(p[0]);
-                        pos.push(p[1]);
-                        pos.push(p[2]);
-
-                        var n=getNrm(alfa,beta);
-
-                        normal.push(n[0]);
-                        normal.push(n[1]);
-                        normal.push(n[2]);
-                    }
-
-                }
-      
-                trianglesVerticeBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, trianglesVerticeBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);    
-            
-
-                trianglesNormalBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, trianglesNormalBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normal), gl.STATIC_DRAW);
-
-                var index=[];
-
-                for (var i=0;i<rows-1;i++){
-                    index.push(i*cols);
-                    for (var j=0;j<cols-1;j++){
-                        index.push(i*cols+j);
-                        index.push((i+1)*cols+j);
-                        index.push(i*cols+j+1);
-                        index.push((i+1)*cols+j+1);
-                    }
-                    index.push((i+1)*cols+cols-1);
-                }
-                
-                
-                trianglesIndexBuffer = gl.createBuffer();
-                trianglesIndexBuffer.number_vertex_point = index.length;
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, trianglesIndexBuffer);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(index), gl.STATIC_DRAW);    
-            }
-
             /*
             *
             *
@@ -2285,87 +2201,6 @@
                 return objeto;
             }
 
-            var sBVerticeBuffer;
-            var sBNormalBuffer;
-            var sBIndexBuffer;
-
-            function probarSuperficieDeBarrido()
-            {
-                
-                const nivelControl = 
-                [
-                    0.5,0.0,0.0,
-                    0.5,0.5,0.0,
-                    0.0,0.5,0.0,
-
-                    0.0,0.5,0.0,
-                    -0.5,0.5,0.0,
-                    -0.5,0.0,0.0,
-
-                    -0.5,0.0,0.0,
-                    -0.5,-0.5,0.0,
-                    0.0,-0.5,0.0,
-
-                    0.0,-0.5,0.0,
-                    0.5,-0.5,0.0,
-                    0.5,0.0,0.0,
-                ];
-                
-                const recorridoControl = 
-                [
-                    -1.0,0.0,0.0,
-                    -1.0,0.0,-1.0,
-                    0.0,0.0,-1.0,
-
-                    0.0,0.0,-1.0,
-                    1.0,0.0,-1.0,
-                    1.0,0.0,0.0,
-                ];
-                
-                /*
-                const recorridoControl = 
-                [
-                    -1.0,0.0,0.0,
-                    -1.0,-1.0,0.0,
-                    0.0,-1.0,0.0,
-
-                    0.0,-1.0,0.0,
-                    1.0,-1.0,0.0,
-                    1.0,0.0,0.0,
-                ];
-                */
-                
-                //var recorrido = bezierCompleto(recorridoControl,100,2);
-                // var nivel = bezierCompleto(nivelControl,100,2);
-                var recorrido = generarRecta(2)
-                var nivel = generarArcoCircunferencia(1,100);
-                var buffers = generarSuperficieDeBarrido(nivel,recorrido);
-
-                //console.log(buffers.bufferPuntos);
-                //console.log(buffers.bufferNormales);
-                //console.log(buffers.bufferIndices);
-
-                sBVerticeBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, sBVerticeBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffers.bufferPuntos), gl.STATIC_DRAW);    
-            
-
-                sBNormalBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, sBNormalBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffers.bufferNormales), gl.STATIC_DRAW);
-                
-                
-                sBIndexBuffer = gl.createBuffer();
-                sBIndexBuffer.number_vertex_point = buffers.bufferIndices.length;
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sBIndexBuffer);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(buffers.bufferIndices), gl.STATIC_DRAW);  
-                
-                //var recorrido = bezierCompleto(recorridoControl,100,2);
-                //var nivel = bezierCompleto(nivelControl,100,2);
-                buffersSupBarrido = superficieBarridoCompleta(nivel,recorrido);
-
-            }
-
             function inicializarObjetos()
             {
 
@@ -2438,74 +2273,6 @@
                 gl.uniformMatrix4fv(projMatrixUniform, false, projMatrix);
             }       
             
-            function drawScene()
-            {
-                setupVertexShaderMatrix();
-
-                /*
-                vertexPositionAttribute = gl.getAttribLocation(glProgram, "aVertexPosition");
-                gl.enableVertexAttribArray(vertexPositionAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, trianglesVerticeBuffer);
-                gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                vertexNormalAttribute = gl.getAttribLocation(glProgram, "aVertexNormal");
-                gl.enableVertexAttribArray(vertexNormalAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, trianglesNormalBuffer);
-                gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, trianglesIndexBuffer);
-                gl.drawElements( gl.TRIANGLE_STRIP, trianglesIndexBuffer.number_vertex_point, gl.UNSIGNED_SHORT, 0);
-                */
-
-                /*
-                vertexPositionAttribute = gl.getAttribLocation(glProgram, "aVertexPosition");
-                gl.enableVertexAttribArray(vertexPositionAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, sBVerticeBuffer);
-                gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                vertexNormalAttribute = gl.getAttribLocation(glProgram, "aVertexNormal");
-                gl.enableVertexAttribArray(vertexNormalAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, sBNormalBuffer);
-                gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sBIndexBuffer);
-                gl.drawElements( gl.TRIANGLE_STRIP, sBIndexBuffer.number_vertex_point, gl.UNSIGNED_SHORT, 0);
-                */
-                
-                vertexPositionAttribute = gl.getAttribLocation(glProgram, "aVertexPosition");
-                gl.enableVertexAttribArray(vertexPositionAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, buffersSupBarrido.supBarridoVerticeBuffer);
-                gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                vertexNormalAttribute = gl.getAttribLocation(glProgram, "aVertexNormal");
-                gl.enableVertexAttribArray(vertexNormalAttribute);
-                gl.bindBuffer(gl.ARRAY_BUFFER, buffersSupBarrido.supBarridoNormalBuffer);
-                gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffersSupBarrido.supBarridoIndexBuffer);
-                gl.drawElements( gl.TRIANGLE_STRIP, buffersSupBarrido.supBarridoIndexBuffer.number_vertex_point, gl.UNSIGNED_SHORT, 0);
-                
-                //gl.drawElements( gl.LINE_STRIP, sBIndexBuffer.number_vertex_point, gl.UNSIGNED_SHORT, 0);
-
-            }
-
-            function animate(){
-                
-                rotate_angle += 0.01;
-                mat4.identity(modelMatrix);
-                //mat4.rotate(modelMatrix,modelMatrix, rotate_angle, [1.0, 0.0, 1.0]);
-                //mat4.identity(viewMatrix);
-                //mat4.translate(viewMatrix,viewMatrix, [0.0, 0.0, -5.0]);
-                //mat4.rotate(viewMatrix,viewMatrix, rotate_angle, [-1.0, 0.0, 0.0]);
-
-
-                mat4.identity(normalMatrix);
-                mat4.multiply(normalMatrix,viewMatrix,modelMatrix);
-                mat4.invert(normalMatrix,normalMatrix);
-                mat4.transpose(normalMatrix,normalMatrix);
-
-            }
-            
             function tick(){
 
                 requestAnimationFrame(tick);
@@ -2545,10 +2312,6 @@
                 punteroAnillo.setRotacion(0,0,1,anguloAnillo);
                 anguloAnillo += variablesGUI.velocidadAnillo/100;
                 
-                //objetos3D.setRotacion(0,1,0,rotate_angle);
-
-                //drawScene();
-                //animate();
             }
 
 
