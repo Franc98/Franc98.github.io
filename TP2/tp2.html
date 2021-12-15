@@ -2687,7 +2687,7 @@
 
                 // Matrix de Proyeccion Perspectiva
 
-                mat4.perspective(projMatrix,45, canvas.width / canvas.height, 0.1, 500.0);
+                mat4.perspective(projMatrix,45, canvas.width / canvas.height, 0.1, 200.0);
                 
                 mat4.identity(modelMatrix);
                 mat4.rotate(modelMatrix,modelMatrix, -1.57078, [1.0, 0.0, 0.0]);
@@ -2790,18 +2790,16 @@
                 var columaSoporte = new Objeto3D();
                 var objetoAuxiliar = new Objeto3D();
 
-                var relacion = longitud/perimetrobase;
-                var factor = 1/4;
                 //color
                 var color = new ColorConReflexion();
                 color.setColorEspecular(1.0,1.0,1.0);
+                color.setColorAmbiente(1.0,1.0,1.0);
+                color.setColorDifuso(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.3,0.6,1.0);
                 color.setGlossiness(100);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png",0.0,factor,0.0,relacion*factor);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png",0.0,0.0,0.0,0.0);
                 color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
                 color.setVertexShader(vertexShader[1]);
-                color.setFragmentShader(fragmentShader[3]);
+                color.setFragmentShader(fragmentShader[4]);
 
                 objetoAuxiliar.setGeometria(bufferBarraLatera);
                 objetoAuxiliar.setPosicion(longitud/2,ancho/2,0);
@@ -2816,17 +2814,6 @@
                 var alturaBarraCruzada = Math.cos(rotacionBarraCruzada)*longitudBarraCruzada;
                 var cantidadBarrasCruzadas = Math.floor(longitud/alturaBarraCruzada);
                 var posicion = (longitud-cantidadBarrasCruzadas*alturaBarraCruzada)/2+alturaBarraCruzada/2;
-
-                relacion = longitudBarraCruzada/perimetrobase;
-                color = new ColorConReflexion();
-                color.setColorEspecular(1.0,1.0,1.0);
-                color.setFactoresLuminosidad(0.3,0.6,1.0);
-                color.setGlossiness(100);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png",0.0,factor,0.0,relacion*factor);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png",0.0,0.0,0.0,0.0);
-                color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
-                color.setVertexShader(vertexShader[1]);
-                color.setFragmentShader(fragmentShader[3]);
 
                 for(var i = 0; i < cantidadBarrasCruzadas; i++)
                 {
@@ -2843,45 +2830,37 @@
 
             }
 
-            function generarModulos(ancho, alto, radioCurvatura, anguloArco, cantPuntosArco = 100, cantPuntosNivel = 24)
+            function generarModulos(ancho, alto, radioCurvatura, anguloArco, cantPuntosArco = 50, cantPuntosNivel = 16)
             {
                 const min = Math.min(ancho,alto);
                 const factorBorde = 0.2
                 const distanciaEsquina = factorBorde*min;
-                const gradoBezier = 2;
+                const gradoBezier = 1;
                 const alto2 = alto/2-distanciaEsquina;
                 const ancho2 = ancho/2-distanciaEsquina;
                 const puntosControlNivel = [
                     ancho/2,-alto2,0.0,
-                    ancho/2,0.0,0.0,
                     ancho/2,alto2,0.0,
 
                     ancho/2,alto2,0.0,
-                    ancho2+distanciaEsquina/2,alto2+distanciaEsquina/2,0.0,
                     ancho2,alto/2,0.0,
 
                     ancho2,alto/2,0.0,
-                    0.0,alto/2,0.0,
                     -ancho2,alto/2,0.0,
 
                     -ancho2,alto/2,0.0,
-                    -ancho2-distanciaEsquina/2,alto2+distanciaEsquina/2,0.0,
                     -ancho/2,alto2,0.0,
 
                     -ancho/2,alto2,0.0,
-                    -ancho/2,0.0,0.0,
                     -ancho/2,-alto2,0.0,
 
                     -ancho/2,-alto2,0.0,
-                    -ancho2-distanciaEsquina/2,-alto2-distanciaEsquina/2,0.0,
                     -ancho2,-alto/2,0.0,
 
                     -ancho2,-alto/2,0.0,
-                    0.0,-alto/2,0.0,
                     ancho2,-alto/2,0.0,
 
                     ancho2,-alto/2,0.0,
-                    ancho2+distanciaEsquina/2,-alto2-distanciaEsquina/2,0.0,
                     ancho/2,-alto2,0.0
                 ];
 
@@ -2984,8 +2963,8 @@
                 // anillo externo 
                 const radio = factorTamanio*7.5;
                 const radioAnillo = factorTamanio*0.5;
-                const cantPuntosAnilloN = 100;
-                const cantPuntosAnilloR = 200;
+                const cantPuntosAnilloN = 50;
+                const cantPuntosAnilloR = 50;
 
                 // modulo 
                 const anchoModulo = factorTamanio*1.1;
@@ -3032,8 +3011,10 @@
                 var prisma = new Prisma(anchoLateral,anchoLateral,radio);
                 superficie = prisma.crearSuperficieBarrido();
                 //superficie = generarPrisma(anchoLateral,anchoLateral,radio);
-                var cilindro = new Cilindro(radioviga,largoCrucado,cantPuntosCruzado); 
-                var superficie2 = cilindro.crearSuperficieBarrido();
+                //var cilindro = new Cilindro(radioviga,largoCrucado,cantPuntosCruzado); 
+                //var superficie2 = cilindro.crearSuperficieBarrido();
+                prisma = new Prisma(2*radioviga,2*radioviga,largoCrucado);
+                superficie2 = prisma.crearSuperficieBarrido();
                 //var superficie2 = generarCilindro(radioviga,largoCrucado,cantPuntosCruzado);
                 
                 var superficie3 = generarModulos(anchoModulo, altoModulo, radio, 360/(2*cantidadModulos));
@@ -3420,7 +3401,7 @@
                 //this.nivel = circulo.crear();
                 //circulo = new ArcoCircunferencia(0, 256);
                 //this.recorrido = circulo.crear();
-                var esfera = new Esfera(radio,256,256);
+                var esfera = new Esfera(radio,128,128);
                 var superficie = esfera.crearSuperficieRevolucion();
                 objeto.setGeometria(superficie);
                 objeto.setColor(color);
@@ -3447,7 +3428,7 @@
                 //this.nivel = circulo.crear();
                 //circulo = new ArcoCircunferencia(0, 256);
                 //this.recorrido = circulo.crear();
-                var esfera = new Esfera(radio,256,256);
+                var esfera = new Esfera(radio,50,50);
                 var superficie = esfera.crearSuperficieRevolucion();
                 objeto.setGeometria(superficie);
                 objeto.setColor(color);
@@ -3457,7 +3438,7 @@
 
             function generarSol()
             {
-                const lado = 200;
+                const lado = 100;
 
                 var color = new Color();
                 color.setColorEspecular(1.0,1.0,1.0);
@@ -3745,7 +3726,7 @@
                 objetos3D.agregarHijo(hijo);
 
                 hijo = generarSol();
-                hijo.setPosicion(0,0,250);
+                hijo.setPosicion(0,0,150);
                 hijo.setRotacion(0,1,0,Math.PI/2)
                 objetos3D.agregarHijo(hijo);
 
