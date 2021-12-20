@@ -34,6 +34,8 @@
 
             attribute vec3 aVertexPosition;
             attribute vec3 aVertexNormal;
+            attribute vec3 aVertexTangent;
+            attribute vec3 aVertexBinormal;
             attribute vec3 aVertexUV;
 
             uniform mat4 modelMatrix;            
@@ -63,6 +65,8 @@
 
             attribute vec3 aVertexPosition;
             attribute vec3 aVertexNormal;
+            attribute vec3 aVertexTangent;
+            attribute vec3 aVertexBinormal;
             attribute vec3 aVertexUV;
 
             uniform mat4 modelMatrix;            
@@ -71,7 +75,9 @@
 
             uniform mat4 normalMatrix;
 
-            varying vec3 vNormal;    
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             varying vec2 vUv;
@@ -83,6 +89,10 @@
                 vPosWorld=(modelMatrix*vec4(aVertexPosition,1.0)).xyz;    //la posicion en coordenadas de mundo
                 vNormal=(normalMatrix*vec4(aVertexNormal,1.0)).xyz;       //la normal en coordenadas de mundo                
                 vNormal = normalize(vNormal);
+                vTangente=(normalMatrix*vec4(aVertexTangent,1.0)).xyz; 
+                vTangente = normalize(vTangente);
+                vBinormal=(normalMatrix*vec4(aVertexBinormal,1.0)).xyz; 
+                vBinormal = normalize(vBinormal);
 
                 vUv = aVertexUV.xy;
                 w = aVertexUV.z;
@@ -94,7 +104,9 @@
 
         <script id="shader-fs1" type="x-shader/x-fragment">
             precision highp float;
-            varying vec3 vNormal;
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             uniform vec3 colorDifuso;
@@ -113,11 +125,13 @@
         
         <script id="shader-fs2" type="x-shader/x-fragment">
             precision highp float;
-            varying vec3 vNormal;
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             // para luces puntuales
-            const int cantidadMaximaLuces = 10;
+            const int cantidadMaximaLuces = 5;
 
             uniform vec3 posLuz[cantidadMaximaLuces];
             uniform vec3 direccionLuz[cantidadMaximaLuces];
@@ -125,7 +139,7 @@
             uniform vec3 colorLuz[cantidadMaximaLuces];
             uniform float exponenteAngulo[cantidadMaximaLuces];
             uniform float cosAngMax[cantidadMaximaLuces];
-            uniform bool esDirectiva[cantidadMaximaLuces];
+            uniform float esDirectiva[cantidadMaximaLuces];
 
             uniform bool luzActiva[cantidadMaximaLuces];
 
@@ -142,6 +156,7 @@
             // texturas
             uniform sampler2D textura[2];
             uniform vec4 parametosUV[2];
+            uniform sampler2D relieve[2];
 
             varying vec2 vUv;
             varying float w;
@@ -152,8 +167,22 @@
 
                 //vec3 color = vec4(1.0,0.0,0.0); 
                 vec4 texColor;
+                vec3 vNormalUsada;
+                vec4 colorNormal;
+                
+                vec2 uvAux0 = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
+                vec2 uvAux1 = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
+
+                colorNormal = (1.0-w)*texture2D(relieve[0], uvAux0) + w*texture2D(relieve[1], uvAux1);
+                colorNormal = 2.0*(colorNormal - vec4(0.5,0.5,0.5,0.0));
+                vNormalUsada = colorNormal.x*vTangente + colorNormal.y*vBinormal +colorNormal.z*vNormal;
+                vNormalUsada = normalize(vNormalUsada);
+
+
+                texColor = (1.0-w)*texture2D(textura[0], uvAux0) + w*texture2D(textura[1], uvAux1);
+                
+                /*
                 vec2 uvAux;
-    
                 if(w < 0.5)
                 {
                     uvAux = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
@@ -164,6 +193,7 @@
                     uvAux = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
                     texColor=texture2D(textura[1], uvAux);
                 }
+                */
                 
                 vec3 colorAmbienteUsado = vec3(texColor.x,texColor.y,texColor.z);
                 vec3 colorDifusoUsado = vec3(texColor.x,texColor.y,texColor.z);
@@ -179,11 +209,15 @@
                     {
                         // obteniendo rayo incidente 
                         vec3 direccionOptimaLuz = normalize(direccionLuz[i]);
+                        float directividad = esDirectiva[i];
+                        vec3 direccionRealLuz = (1.0-directividad)*(vPosWorld-posLuz[i]) + directividad*direccionLuz[i];
+                        /*
                         vec3 direccionRealLuz = vPosWorld-posLuz[i];
                         if(esDirectiva[i])
                         {
-                            direccionRealLuz = direccionLuz[i];
+                            direccionRealLuz = ;
                         }
+                        */
                         direccionRealLuz = normalize(direccionRealLuz);
                         float distancia = length(vPosWorld-posLuz[i]);
                         float coeficienteIntensidad = (dot(direccionOptimaLuz,direccionRealLuz)-cosAngMax[i]);
@@ -196,9 +230,9 @@
         
                         // aplicando luz a la superficie
         
-                        float cosBeta  = dot(-direccionRealLuz,vNormal);
+                        float cosBeta  = dot(-direccionRealLuz,vNormalUsada);
                         float cosTita = (cosBeta +abs(cosBeta))/2.0;
-                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormal);
+                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormalUsada);
                         float cosPhi = dot(camara,vectorReflejado);
                         cosPhi = (cosPhi+abs(cosPhi))/2.0;
                         float rS = pow(cosPhi,glossiness);      
@@ -217,18 +251,22 @@
                 gl_FragColor = vec4(colorFinal,1.0);
                 //gl_FragColor = vec4(colorDifusoUsado,1.0);
                 //gl_FragColor = texColor;
-                //gl_FragColor = vec4(vNormal,1.0);
+                //gl_FragColor = vec4(vNormalUsada,1.0);
+                //vec3 vecAux = (vTangente + vec3(1.0,1.0,1.0))/2.0;
+                //gl_FragColor = vec4(vecAux,1.0);
          
             }
         </script>
 
         <script id="shader-fs3" type="x-shader/x-fragment">
             precision highp float;
-            varying vec3 vNormal;
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             // para luces puntuales
-            const int cantidadMaximaLuces = 10;
+            const int cantidadMaximaLuces = 5;
 
             uniform vec3 posLuz[cantidadMaximaLuces];
             uniform vec3 direccionLuz[cantidadMaximaLuces];
@@ -236,7 +274,7 @@
             uniform vec3 colorLuz[cantidadMaximaLuces];
             uniform float exponenteAngulo[cantidadMaximaLuces];
             uniform float cosAngMax[cantidadMaximaLuces];
-            uniform bool esDirectiva[cantidadMaximaLuces];
+            uniform float esDirectiva[cantidadMaximaLuces];
 
             uniform bool luzActiva[cantidadMaximaLuces];
 
@@ -253,6 +291,7 @@
             // texturas
             uniform sampler2D textura[2];
             uniform vec4 parametosUV[2];
+            uniform sampler2D relieve[2];
 
             varying vec2 vUv;
             varying float w;
@@ -260,6 +299,17 @@
             uniform vec3 centroCamara;
 
             void main(void) {
+
+                vec3 vNormalUsada;
+                vec4 colorNormal;
+
+                vec2 uvAux0 = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
+                vec2 uvAux1 = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
+
+                colorNormal = (1.0-w)*texture2D(relieve[0], uvAux0) + w*texture2D(relieve[1], uvAux1);
+                colorNormal = 2.0*(colorNormal - vec4(0.5,0.5,0.5,0.0));
+                vNormalUsada = colorNormal.x*vTangente + colorNormal.y*vBinormal +colorNormal.z*vNormal;
+                vNormalUsada = normalize(vNormalUsada);
 
                 vec3 colorFinal = vec3(0.0,0.0,0.0);
                 //const int valorLoop = cantidadLuces;
@@ -271,11 +321,15 @@
                     {
                         // obteniendo rayo incidente 
                         vec3 direccionOptimaLuz = normalize(direccionLuz[i]);
+                        float directividad = esDirectiva[i];
+                        vec3 direccionRealLuz = (1.0-directividad)*(vPosWorld-posLuz[i]) + directividad*direccionLuz[i];
+                        /*
                         vec3 direccionRealLuz = vPosWorld-posLuz[i];
                         if(esDirectiva[i])
                         {
-                            direccionRealLuz = direccionLuz[i];
+                            direccionRealLuz = ;
                         }
+                        */
                         direccionRealLuz = normalize(direccionRealLuz);
                         float distancia = length(vPosWorld-posLuz[i]);
                         float coeficienteIntensidad = (dot(direccionOptimaLuz,direccionRealLuz)-cosAngMax[i]);
@@ -288,9 +342,9 @@
         
                         // aplicando luz a la superficie
         
-                        float cosBeta  = dot(-direccionRealLuz,vNormal);
+                        float cosBeta  = dot(-direccionRealLuz,vNormalUsada);
                         float cosTita = (cosBeta +abs(cosBeta))/2.0;
-                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormal);
+                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormalUsada);
                         float cosPhi = dot(camara,vectorReflejado);
                         cosPhi = (cosPhi+abs(cosPhi))/2.0;
                         float rS = pow(cosPhi,glossiness);      
@@ -307,17 +361,19 @@
                 colorFinal = min(vec3(1.0,1.0,1.0),colorFinal);
                 
                 gl_FragColor = vec4(colorFinal,1.0);
-                //gl_FragColor = vec4(vNormal,1.0); 
+                //gl_FragColor = vec4(vNormalUsada,1.0); 
             }
         </script>
 
         <script id="shader-fs4" type="x-shader/x-fragment">
             precision highp float;
-            varying vec3 vNormal;
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             // para luces puntuales
-            const int cantidadMaximaLuces = 10;
+            const int cantidadMaximaLuces = 5;
 
             uniform vec3 posLuz[cantidadMaximaLuces];
             uniform vec3 direccionLuz[cantidadMaximaLuces];
@@ -325,7 +381,7 @@
             uniform vec3 colorLuz[cantidadMaximaLuces];
             uniform float exponenteAngulo[cantidadMaximaLuces];
             uniform float cosAngMax[cantidadMaximaLuces];
-            uniform bool esDirectiva[cantidadMaximaLuces];
+            uniform float esDirectiva[cantidadMaximaLuces];
 
             uniform bool luzActiva[cantidadMaximaLuces];
 
@@ -342,6 +398,7 @@
             // texturas
             uniform sampler2D textura[2];
             uniform vec4 parametosUV[2];
+            uniform sampler2D relieve[2];
 
             varying vec2 vUv;
             varying float w;
@@ -354,8 +411,21 @@
 
                 //vec3 color = vec4(1.0,0.0,0.0); 
                 vec4 texColor;
-                vec2 uvAux;
+                vec3 vNormalUsada;
+                vec4 colorNormal;
+
+                vec2 uvAux0 = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
+                vec2 uvAux1 = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
+
+                colorNormal = (1.0-w)*texture2D(relieve[0], uvAux0) + w*texture2D(relieve[1], uvAux1);
+                colorNormal = 2.0*(colorNormal - vec4(0.5,0.5,0.5,0.0));
+                vNormalUsada = colorNormal.x*vTangente + colorNormal.y*vBinormal +colorNormal.z*vNormal;
+                vNormalUsada = normalize(vNormalUsada);
+                //vNormalUsada = vNormal;
+                texColor = (1.0-w)*texture2D(textura[0], uvAux0) + w*texture2D(textura[1], uvAux1);
     
+                /*
+                vec2 uvAux;
                 if(w < 0.5)
                 {
                     uvAux = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
@@ -366,6 +436,7 @@
                     uvAux = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
                     texColor=texture2D(textura[1], uvAux);
                 }
+                */
                 
                 vec3 colorAmbienteUsado = vec3(texColor.x,texColor.y,texColor.z);
                 vec3 colorDifusoUsado = vec3(texColor.x,texColor.y,texColor.z);
@@ -381,11 +452,15 @@
                     {
                         // obteniendo rayo incidente 
                         vec3 direccionOptimaLuz = normalize(direccionLuz[i]);
+                        float directividad = esDirectiva[i];
+                        vec3 direccionRealLuz = (1.0-directividad)*(vPosWorld-posLuz[i]) + directividad*direccionLuz[i];
+                        /*
                         vec3 direccionRealLuz = vPosWorld-posLuz[i];
                         if(esDirectiva[i])
                         {
-                            direccionRealLuz = direccionLuz[i];
+                            direccionRealLuz = ;
                         }
+                        */
                         direccionRealLuz = normalize(direccionRealLuz);
                         float distancia = length(vPosWorld-posLuz[i]);
                         float coeficienteIntensidad = (dot(direccionOptimaLuz,direccionRealLuz)-cosAngMax[i]);
@@ -398,9 +473,9 @@
         
                         // aplicando luz a la superficie
         
-                        float cosBeta  = dot(-direccionRealLuz,vNormal);
+                        float cosBeta  = dot(-direccionRealLuz,vNormalUsada);
                         float cosTita = (cosBeta +abs(cosBeta))/2.0;
-                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormal);
+                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormalUsada);
                         float cosPhi = dot(camara,vectorReflejado);
                         cosPhi = (cosPhi+abs(cosPhi))/2.0;
                         float rS = pow(cosPhi,glossiness);      
@@ -417,8 +492,8 @@
 
                 
                 vec3 vectorCamara = normalize(vPosWorld-centroCamara);
-                vec3 vectorIncidente = reflect(vectorCamara,vNormal);
-                //vec3 vectorIncidente = reflect(camara,vNormal);
+                vec3 vectorIncidente = reflect(vectorCamara,vNormalUsada);
+                //vec3 vectorIncidente = reflect(camara,vNormalUsada);
                 float v = acos(vectorIncidente.y);
                 v = degrees(v)/180.0;
                 float u = atan(vectorIncidente.x,vectorIncidente.z);
@@ -433,17 +508,20 @@
                 //gl_FragColor = vec4(colorDifusoUsado,1.0);
                 //gl_FragColor = texColor;
                 //gl_FragColor = texColor;
+                //gl_FragColor = vec4(vNormalUsada,1.0);
          
             }
         </script>
 
         <script id="shader-fs5" type="x-shader/x-fragment">
             precision highp float;
-            varying vec3 vNormal;
+            varying vec3 vNormal;  
+            varying vec3 vTangente;
+            varying vec3 vBinormal;
             varying vec3 vPosWorld;
 
             // para luces puntuales
-            const int cantidadMaximaLuces = 10;
+            const int cantidadMaximaLuces = 5;
 
             uniform vec3 posLuz[cantidadMaximaLuces];
             uniform vec3 direccionLuz[cantidadMaximaLuces];
@@ -451,7 +529,7 @@
             uniform vec3 colorLuz[cantidadMaximaLuces];
             uniform float exponenteAngulo[cantidadMaximaLuces];
             uniform float cosAngMax[cantidadMaximaLuces];
-            uniform bool esDirectiva[cantidadMaximaLuces];
+            uniform float esDirectiva[cantidadMaximaLuces];
 
             uniform bool luzActiva[cantidadMaximaLuces];
 
@@ -468,6 +546,7 @@
             // texturas
             uniform sampler2D textura[2];
             uniform vec4 parametosUV[2];
+            uniform sampler2D relieve[2];
 
             varying vec2 vUv;
             varying float w;
@@ -476,23 +555,44 @@
             uniform sampler2D mapaDeReflexion;
             uniform vec3 centroCamara;
 
+            // mapa de relieve
+            
+
             void main(void) {
+
+                // modificaion de normal
 
                 vec3 colorFinal = vec3(0.0,0.0,0.0);
                 //const int valorLoop = cantidadLuces;
                 vec3 colorDifusoFinal = vec3(0.0,0.0,0.0);
                 vec3 colorEspecularFinal = vec3(0.0,0.0,0.0);
+
+                vec3 vNormalUsada;
+                vec4 colorNormal;
+
+                vec2 uvAux0 = vec2(parametosUV[0][0]+vUv.x*parametosUV[0][1],parametosUV[0][2]+vUv.y*parametosUV[0][3]);
+                vec2 uvAux1 = vec2(parametosUV[1][0]+vUv.x*parametosUV[1][1],parametosUV[1][2]+vUv.y*parametosUV[1][3]);
+
+                colorNormal = (1.0-w)*texture2D(relieve[0], uvAux0) + w*texture2D(relieve[1], uvAux1);
+                colorNormal = 2.0*(colorNormal - vec4(0.5,0.5,0.5,0.0));
+                vNormalUsada = colorNormal.x*vTangente + colorNormal.y*vBinormal +colorNormal.z*vNormal;
+                vNormalUsada = normalize(vNormalUsada);
+
                 for(int i = 0; i < cantidadMaximaLuces ; i++)
                 {
                     if(luzActiva[i])
                     {
                         // obteniendo rayo incidente 
                         vec3 direccionOptimaLuz = normalize(direccionLuz[i]);
+                        float directividad = esDirectiva[i];
+                        vec3 direccionRealLuz = (1.0-directividad)*(vPosWorld-posLuz[i]) + directividad*direccionLuz[i];
+                        /*
                         vec3 direccionRealLuz = vPosWorld-posLuz[i];
                         if(esDirectiva[i])
                         {
                             direccionRealLuz = direccionLuz[i];
                         }
+                        */
                         direccionRealLuz = normalize(direccionRealLuz);
                         float distancia = length(vPosWorld-posLuz[i]);
                         float coeficienteIntensidad = (dot(direccionOptimaLuz,direccionRealLuz)-cosAngMax[i]);
@@ -505,9 +605,9 @@
         
                         // aplicando luz a la superficie
         
-                        float cosBeta  = dot(-direccionRealLuz,vNormal);
+                        float cosBeta  = dot(-direccionRealLuz,vNormalUsada);
                         float cosTita = (cosBeta +abs(cosBeta))/2.0;
-                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormal);
+                        vec3 vectorReflejado = ceil(cosTita)*reflect(direccionRealLuz,vNormalUsada);
                         float cosPhi = dot(camara,vectorReflejado);
                         cosPhi = (cosPhi+abs(cosPhi))/2.0;
                         float rS = pow(cosPhi,glossiness);      
@@ -523,7 +623,7 @@
                 colorFinal = max(colorFinal,colorDifusoFinal);
 
                 vec3 vectorCamara = normalize(vPosWorld-centroCamara);
-                vec3 vectorIncidente = reflect(vectorCamara,vNormal);
+                vec3 vectorIncidente = reflect(vectorCamara,vNormalUsada);
                 float v = acos(vectorIncidente.y);
                 v = degrees(v)/180.0;
                 float u = atan(vectorIncidente.x,vectorIncidente.z);
@@ -535,7 +635,7 @@
                 colorFinal = min(vec3(1.0,1.0,1.0),colorFinal);
                 
                 gl_FragColor = vec4(colorFinal,1.0);
-                //gl_FragColor = vec4(vNormal,1.0); 
+                //gl_FragColor = vec4(vNormalUsada,1.0); 
             }
         </script>
 
@@ -555,12 +655,11 @@
             const cantFS = 3;
             const cantVS = 2;
                 
-            var vertexPositionAttribute = null,
-            trianglesVerticeBuffer = null,
-            vertexNormalAttribute = null,
-            vertexUVAttribute = null,
-            trianglesNormalBuffer = null,
-            trianglesIndexBuffer = null;
+            var vertexPositionAttribute = null;
+            var vertexNormalAttribute = null;
+            var vertexUVAttribute = null;
+            var vertexBinormalAttribute = null;
+            var vertexTangentAttribute = null;
                
             var modelMatrix = mat4.create();
             var viewMatrix = mat4.create();
@@ -577,6 +676,8 @@
                     //buffers
                     this.vertexBuffer = null;
                     this.normalBuffer = null;
+                    this.binormalBuffer = null;
+                    this.tangentBuffer = null;
                     this.uVBuffer = null;
                     this.indexBuffer = null;
                     //matricex
@@ -642,6 +743,16 @@
                     gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
                     gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
 
+                    vertexBinormalAttribute = gl.getAttribLocation(glProgram, "aVertexBinormal");
+                    gl.enableVertexAttribArray(vertexBinormalAttribute);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.binormalBuffer);
+                    gl.vertexAttribPointer(vertexBinormalAttribute, 3, gl.FLOAT, false, 0, 0);
+
+                    vertexTangentAttribute = gl.getAttribLocation(glProgram, "aVertexTangent");
+                    gl.enableVertexAttribArray(vertexTangentAttribute);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.tangentBuffer);
+                    gl.vertexAttribPointer(vertexTangentAttribute, 3, gl.FLOAT, false, 0, 0);
+
                     vertexUVAttribute = gl.getAttribLocation(glProgram, "aVertexUV");
                     gl.enableVertexAttribArray(vertexUVAttribute);
                     gl.bindBuffer(gl.ARRAY_BUFFER, this.uVBuffer);
@@ -657,10 +768,12 @@
                     } 
                 }
                 
-                setGeometria (vertexBuffer,normalBuffer,uVBuffer,indexBuffer)
+                setGeometria (vertexBuffer,normalBuffer,tangentBuffer,binormalBuffer,uVBuffer,indexBuffer)
                 {
                     this.vertexBuffer = vertexBuffer;
                     this.normalBuffer = normalBuffer;
+                    this.binormalBuffer = binormalBuffer;
+                    this.tangentBuffer = tangentBuffer;
                     this.uVBuffer = uVBuffer;
                     this.indexBuffer = indexBuffer;
                 }
@@ -669,6 +782,8 @@
                 {
                     this.vertexBuffer = buffers.supBarridoVerticeBuffer;
                     this.normalBuffer = buffers.supBarridoNormalBuffer;
+                    this.binormalBuffer = buffers.supBarridoBinormalBuffer;
+                    this.tangentBuffer = buffers.supBarridoTangentBuffer;
                     this.uVBuffer = buffers.supBarridoUVBuffer;
                     this.indexBuffer = buffers.supBarridoIndexBuffer;
                 }
@@ -1000,6 +1115,69 @@
                 
             }
  
+            class AccionCapsula
+            {
+                constructor()
+                {
+                    this.valoresDesplazamiento = DELTA_TRASLACION;
+                    this.valorRotacion = DELTA_ROTACION;
+                    this.factorAdelante = 0;
+                    this.factorArriba = 0;
+                    this.factorIzquierda = 0;
+                    this.factorGuiniada = 0;
+                    this.factorCabeceo = 0;
+                }
+
+                setFactorAdelante(factor)
+                {
+                    this.factorAdelante = factor;
+                }
+
+                setFactorArriba(factor)
+                {
+                    this.factorArriba = factor;
+                }
+
+                setFactorIzquierda(factor)
+                {
+                    this.factorIzquierda = factor;
+                }
+
+                setFactorGuiniada(factor)
+                {
+                    this.factorGuiniada = factor;
+                }
+
+                setFactorCabeceo(factor)
+                {
+                    this.factorCabeceo = factor;
+                }
+
+                getDesplazamientoAdelante()
+                {
+                    return this.factorAdelante*this.valoresDesplazamiento;
+                }
+
+                getDesplazamientoArriba()
+                {
+                    return this.factorArriba*this.valoresDesplazamiento;
+                }
+
+                getDesplazamientoIzquierda()
+                {
+                    return this.factorIzquierda*this.valoresDesplazamiento;
+                }
+            
+                getRotacionGuiniada()
+                {
+                    return this.factorGuiniada*this.valorRotacion;
+                }
+
+                getRotacionCabeceo()
+                {
+                    return this.factorCabeceo*this.valorRotacion;
+                }
+            }
             // iluminacion y color
             class Color
             {
@@ -1009,6 +1187,7 @@
                     this.fragmentShader = null;
                     this.programa = null;
                     this.texturasFigura = [];
+                    this.texturaRelieve = [];
                     this.texturaReflexion = [];
                     this.parametrosUV = [];
                     this.luces = null
@@ -1029,6 +1208,11 @@
                 agregarTextura(srcimagen)
                 {
                     this.texturasFigura.push(cearTextura(srcimagen));
+                }
+                
+                agregarRelieve(srcimagen)
+                {
+                    this.texturaRelieve.push(cearTextura(srcimagen));
                 }
                 
                 agregarParametrosUV(inicioU = 0.0,escaladoU = 1.0,inicioV = 0.0,escaladoV = 1.0)
@@ -1062,6 +1246,9 @@
                         gl.activeTexture(this.glTexturasFigura[i]);
                         gl.bindTexture(gl.TEXTURE_2D, this.texturasFigura[i]);
                         gl.uniform1i(gl.getUniformLocation(glProgram, sprintf("textura[%d]",i)), i);
+                        gl.activeTexture(this.glTexturasFigura[i+2]);
+                        gl.bindTexture(gl.TEXTURE_2D, this.texturaRelieve[i]);
+                        gl.uniform1i(gl.getUniformLocation(glProgram, sprintf("relieve[%d]",i)), i+2);
                         var parametosUV = gl.getUniformLocation(glProgram, sprintf("parametosUV[%d]",i));
                         gl.uniform4fv(parametosUV , this.parametrosUV[i]);
                     }
@@ -1125,9 +1312,10 @@
                     }
                 }
 
-                agregarTexturaConParametrosUV(srcimagen,inicioU = 0.0,escaladoU = 1.0,inicioV = 0.0,escaladoV = 1.0)
+                agregarTexturaConParametrosUV(srcimagenTextura,srcimagenRelieve,inicioU = 0.0,escaladoU = 1.0,inicioV = 0.0,escaladoV = 1.0)
                 {
-                    this.agregarTextura(srcimagen);
+                    this.agregarTextura(srcimagenTextura);
+                    this.agregarRelieve(srcimagenRelieve);
                     this.agregarParametrosUV(inicioU,escaladoU,inicioV,escaladoV);
                     this.cantidadTexturas++;
                 }
@@ -1169,12 +1357,15 @@
                         gl.activeTexture(this.glTexturasFigura[i]);
                         gl.bindTexture(gl.TEXTURE_2D, this.texturasFigura[i]);
                         gl.uniform1i(gl.getUniformLocation(glProgram, sprintf("textura[%d]",i)), i);
+                        gl.activeTexture(this.glTexturasFigura[i+2]);
+                        gl.bindTexture(gl.TEXTURE_2D, this.texturaRelieve[i]);
+                        gl.uniform1i(gl.getUniformLocation(glProgram, sprintf("relieve[%d]",i)), i+2);
                         var parametosUV = gl.getUniformLocation(glProgram, sprintf("parametosUV[%d]",i));
                         gl.uniform4fv(parametosUV , this.parametrosUV[i]);
                     }
-                    gl.activeTexture(this.glTexturasFigura[2]);
+                    gl.activeTexture(this.glTexturasReflexion[0]);
                     gl.bindTexture(gl.TEXTURE_2D, this.mapaDeReflexion);
-                    gl.uniform1i(gl.getUniformLocation(glProgram, "mapaDeReflexion"), 2);
+                    gl.uniform1i(gl.getUniformLocation(glProgram, "mapaDeReflexion"), 6);
 
                 }
 
@@ -1195,7 +1386,7 @@
                     this.coficientesDistancia = vec3.fromValues(0.0,0.0,1.0);
                     this.decaimientoAngulo = 0.0001;
                     this.color = vec3.fromValues(1.0,1.0,1.0);
-                    this.fuenteDirecta = false;
+                    this.fuenteDirecta = 0;
                 }
                 // métodos privados
                 modificarPosicion(matrizPadre)
@@ -1243,7 +1434,7 @@
                     gl.uniform3fv(colorLuz, this.color);
                     gl.uniform1f(cosAngMax,this.cosAngulomaximo);
                     gl.uniform1f(exponenteAngulo, this.decaimientoAngulo);
-                    gl.uniform1i(esDirectiva, this.fuenteDirecta);
+                    gl.uniform1f(esDirectiva, this.fuenteDirecta);
                 }
 
                 setCentro(x,y,z)
@@ -1291,7 +1482,10 @@
 
                 setDirectividad(esDirectivo)
                 {
-                    this.fuenteDirecta = esDirectivo;
+                    this.fuenteDirecta = 0;
+                    if(esDirectivo){
+                        this.fuenteDirecta ++;
+                    }
                 }
              
             } 
@@ -1742,7 +1936,7 @@
                     this.radio = radio;
                     this.anguloInicial = anguloInicialEnGrados*Math.PI/180;
                     this.angulo = anguloArcoEnGrados *Math.PI/180;
-                    this.cantidadPuntos = cantidadPuntos;
+                    this.cantidadPuntos = Math.ceil(cantidadPuntos);
                 }
                 // Métodos Privados
 
@@ -1754,7 +1948,7 @@
 
                 setCantidadPuntos(cantidadPuntos)
                 {
-                    this.cantidadPuntos = cantidadPuntos;
+                    this.cantidadPuntos = Math.ceil(cantidadPuntos);
                 }
 
                 setAnguloArco(anguloEnGrados)
@@ -1814,6 +2008,8 @@
                     this.invertirNormalTapas = false;
                     this.tapaInicial = true;
                     this.tapaFinal = true;
+                    this.invertirUTapa = false;
+                    this.invertirVTapa = false;
                 }
                 // Métodos Privados 
                 calcularValorBufferUVSuperficie(posicionesUoV, cantidadPuntosUoV)
@@ -1911,27 +2107,48 @@
                 {
                     var bufferPuntos = [];
                     var bufferNormales = [];
+                    var bufferBinormales = [];
+                    var bufferTangentes = [];
                     var bufferUV = [];
                     var punto = vec3.create();
                     var normal = vec4.create();
+                    var binormal = vec4.create();
+                    var tangente = vec4.create();
                     var normalAux = vec3.create();
+                    var binormalAux = vec3.create();
+                    var tangenteAux = vec3.create();
                     for(var i = 0; i<this.nivel.cantidadPuntosFinal; i++)
                     {   
                         vec3.set(punto,this.nivel.posicion[3*i],this.nivel.posicion[3*i+1],this.nivel.posicion[3*i+2]);
                         vec4.set(normal,this.nivel.normal[3*i],this.nivel.normal[3*i+1],this.nivel.normal[3*i+2],1);
+                        vec4.set(tangente,this.nivel.tangente[3*i],this.nivel.tangente[3*i+1],this.nivel.tangente[3*i+2],1);
+                        vec4.set(binormal,this.nivel.binormal[3*i],this.nivel.binormal[3*i+1],this.nivel.binormal[3*i+2],1);
                         vec3.transformMat4(punto,punto,matrizModelado);
                         vec4.transformMat4(normal,normal,matrizNormal);
+                        vec4.transformMat4(tangente,tangente,matrizNormal);
+                        vec4.transformMat4(binormal,binormal,matrizNormal);
                         //invierto signo normal
                         vec4.scale(normal,normal,-1);
+                        vec4.scale(binormal,binormal,-1);
                         vec3.set(normalAux,normal[0],normal[1],normal[2]);
+                        vec3.set(tangenteAux,tangente[0],tangente[1],tangente[2]);
+                        vec3.set(binormalAux,binormal[0],binormal[1],binormal[2]);
+
                         vec3.normalize(normalAux,normalAux);
+                        vec3.normalize(tangenteAux,tangenteAux);
+                        vec3.normalize(binormalAux,binormalAux);
+
                         bufferPuntos.push(punto[0],punto[1],punto[2]);
                         bufferNormales.push(normalAux[0],normalAux[1],normalAux[2]);
+                        bufferTangentes.push(tangenteAux[0],tangenteAux[1],tangenteAux[2]);
+                        bufferBinormales.push(binormalAux[0],binormalAux[1],binormalAux[2]);
                         bufferUV.push(bufferU[i],valorV, this.wSuperficie);
                     }
                     return{
                         bufferPuntos,
                         bufferNormales,
+                        bufferTangentes,
+                        bufferBinormales,
                         bufferUV
                     };
                 }
@@ -2012,6 +2229,14 @@
                     ypromedio = ypromedio/cantidadPuntos;
                     var xdif = xmax-xmin;
                     var ydif = ymax-ymin;
+                    if(xdif == 0)
+                    {
+                        xdif = 1;
+                    }
+                    if(ydif == 0)
+                    {
+                        ydif = 1;
+                    }
 
                     xaux = xpromedio - xmin;
                     xpromedio = xaux/xdif;
@@ -2022,7 +2247,7 @@
                     {
                         xaux = posicionesTapa[3*i] - xmin;
                         xaux = xaux/xdif;
-                        yaux = posicionesTapa[3*i+1] - ymin;
+                        yaux = ymax - posicionesTapa[3*i+1];
                         yaux = yaux/ydif;
                         bufferUVBorde.push(xaux);
                         bufferUVBorde.push(yaux);
@@ -2046,6 +2271,8 @@
 
                     var bufferPuntos = [];
                     var bufferNormales = [];
+                    var bufferTangentes = [];
+                    var bufferBinormales = [];
                     var bufferUV = [];
                     var bufferIndices;
 
@@ -2062,6 +2289,8 @@
                         nivelNuevo = this.obtenerTransformacionNivel(matrices.matrizModelado, matrices.matrizNormal, bufferU, bufferV[i],this.wSuperficie);
                         bufferPuntos = bufferPuntos.concat(nivelNuevo.bufferPuntos);
                         bufferNormales = bufferNormales.concat(nivelNuevo.bufferNormales);
+                        bufferTangentes = bufferTangentes.concat(nivelNuevo.bufferTangentes);
+                        bufferBinormales = bufferBinormales.concat(nivelNuevo.bufferBinormales);
                         bufferUV = bufferUV.concat(nivelNuevo.bufferUV);
                         
                     }
@@ -2070,6 +2299,8 @@
                     return{
                         bufferPuntos,
                         bufferNormales,
+                        bufferTangentes,
+                        bufferBinormales,
                         bufferUV,
                         bufferIndices
                     };
@@ -2080,6 +2311,8 @@
                 {
                     var buffersSuperficie = this.generarSuperficieDeBarrido();
                     var tangenteRecorrido;
+                    var normalRecorrido;
+                    var binormalRecorrido;
                     var centroTapaX = 0;
                     var centroTapaY = 0;
                     var centroTapaZ = 0;
@@ -2092,6 +2325,8 @@
 
                     var bufferPosicion = [];
                     var bufferNormal = [];
+                    var bufferTangente = [];
+                    var bufferBinormal = [];
                     var bufferUV = [];
                     var bufferIndice;
 
@@ -2101,7 +2336,10 @@
                     {
                         puntosTapa = buffersSuperficie.bufferPuntos.slice(0,3*cantidadColumnas);
                         tangenteRecorrido = this.recorrido.tangente.slice(0,3);
+                        normalRecorrido = this.recorrido.normal.slice(0,3);
+                        binormalRecorrido = this.recorrido.binormal.slice(0,3);
                         tangenteRecorrido = vec3.scale(tangenteRecorrido,tangenteRecorrido,-1);
+                        binormalRecorrido = vec3.scale(binormalRecorrido,binormalRecorrido,-1);
                         //console.log(tangenteRecorrido);
                         centroTapaX = 0;
                         centroTapaY = 0;
@@ -2113,6 +2351,10 @@
                             centroTapaZ += puntosTapa[3*i+2];
                             bufferNormal.push(tangenteRecorrido[0],tangenteRecorrido[1],tangenteRecorrido[2]);
                             bufferNormal.push(tangenteRecorrido[0],tangenteRecorrido[1],tangenteRecorrido[2]);
+                            bufferTangente.push(normalRecorrido[0],normalRecorrido[1],normalRecorrido[2]);
+                            bufferTangente.push(normalRecorrido[0],normalRecorrido[1],normalRecorrido[2]);
+                            bufferBinormal.push(binormalRecorrido[0],binormalRecorrido[1],binormalRecorrido[2]);
+                            bufferBinormal.push(binormalRecorrido[0],binormalRecorrido[1],binormalRecorrido[2]);
                         }
                         centroTapaX = centroTapaX/cantidadColumnas;
                         centroTapaY = centroTapaY/cantidadColumnas;
@@ -2135,12 +2377,18 @@
 
                     bufferPosicion = bufferPosicion.concat(buffersSuperficie.bufferPuntos);
                     bufferNormal = bufferNormal.concat(buffersSuperficie.bufferNormales);
+                    bufferBinormal = bufferBinormal.concat(buffersSuperficie.bufferBinormales);
+                    bufferTangente = bufferTangente.concat(buffersSuperficie.bufferTangentes);
                     bufferUV = bufferUV.concat(buffersSuperficie.bufferUV);
 
                     if(this.tapaFinal)
                     {
                         puntosTapa = buffersSuperficie.bufferPuntos.slice(3*(cantidadTotalPuntos-cantidadColumnas),3*cantidadTotalPuntos);
                         tangenteRecorrido = this.recorrido.tangente.slice(3*(cantidadFilas-1),3*cantidadFilas);
+                        normalRecorrido = this.recorrido.normal.slice(3*(cantidadFilas-1),3*cantidadFilas);
+                        binormalRecorrido = this.recorrido.binormal.slice(3*(cantidadFilas-1),3*cantidadFilas);
+                        binormalRecorrido = vec3.scale(binormalRecorrido,binormalRecorrido,-1);
+
                         centroTapaX = 0;
                         centroTapaY = 0;
                         centroTapaZ = 0;
@@ -2151,6 +2399,10 @@
                             centroTapaZ += puntosTapa[3*i+2];
                             bufferNormal.push(tangenteRecorrido[0],tangenteRecorrido[1],tangenteRecorrido[2]);
                             bufferNormal.push(tangenteRecorrido[0],tangenteRecorrido[1],tangenteRecorrido[2]);
+                            bufferTangente.push(normalRecorrido[0],normalRecorrido[1],normalRecorrido[2]);
+                            bufferTangente.push(normalRecorrido[0],normalRecorrido[1],normalRecorrido[2]);
+                            bufferBinormal.push(binormalRecorrido[0],binormalRecorrido[1],binormalRecorrido[2]);
+                            bufferBinormal.push(binormalRecorrido[0],binormalRecorrido[1],binormalRecorrido[2]);
                             bufferPosicion.push(puntosTapa[3*i],puntosTapa[3*i+1],puntosTapa[3*i+2]);                        
                         }
                         centroTapaX = centroTapaX/cantidadColumnas;
@@ -2169,15 +2421,26 @@
                     bufferIndice = this.obtenerIndexBuffer(cantidadFilasFinal,cantidadColumnas);
 
                     //console.log(bufferUV);
+                    //console.log(bufferPosicion);
+                    //console.log(bufferNormal);
+                    //console.log(bufferBinormal);
+                    //console.log(bufferTangente);
 
                     var supBarridoVerticeBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoVerticeBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferPosicion), gl.STATIC_DRAW);    
-                
 
                     var supBarridoNormalBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoNormalBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferNormal), gl.STATIC_DRAW);
+
+                    var supBarridoBinormalBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoBinormalBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferBinormal), gl.STATIC_DRAW);
+
+                    var supBarridoTangentBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoTangentBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferTangente), gl.STATIC_DRAW);
 
                     var supBarridoUVBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoUVBuffer);
@@ -2191,6 +2454,8 @@
                     return {
                         supBarridoVerticeBuffer,
                         supBarridoNormalBuffer,
+                        supBarridoTangentBuffer,
+                        supBarridoBinormalBuffer,
                         supBarridoUVBuffer,
                         supBarridoIndexBuffer
                     };
@@ -2224,10 +2489,14 @@
 
                     var buffersSuperficie = this.generarSuperficieDeBarrido();
                     var bufferUVAux = this.calcularValorBufferUVTapas(this.recorrido.posicion, this.recorrido.cantidadPuntosFinal);
+                    //console.log(bufferUVAux.bufferUVBorde);
+                    //console.log(bufferUVAux.bufferUVCentro);
 
                     var posicion;
                     var tapa = [];
                     var normalTapa = [];
+                    var binormalTapa = [];
+                    var tangenteTapa = [];
                     var puntosTapa;
 
                     var centroX;
@@ -2248,9 +2517,14 @@
                             posicion += 3*this.nivel.cantidadPuntosFinal;
                         }
                         normalTapa = vec3.fromValues(this.recorrido.binormal[0],this.recorrido.binormal[1],this.recorrido.binormal[2]);
+                        binormalTapa = vec3.fromValues(-1*this.recorrido.tangente[0],-1*this.recorrido.tangente[1],-1*this.recorrido.tangente[2]);
+                        tangenteTapa = vec3.fromValues(-1*this.recorrido.normal[0],-1*this.recorrido.normal[1],-1*this.recorrido.normal[2]);
+                        
                         if(this.invertirNormalTapas)
                         {
                             vec3.scale(normalTapa,normalTapa,-1);
+                            vec3.scale(binormalTapa,binormalTapa,-1);
+                            vec3.scale(tangenteTapa,tangenteTapa,-1);
                         }
                         for(var i=0; i< puntosTapa; i++)
                         {
@@ -2279,6 +2553,20 @@
                             buffersSuperficie.bufferNormales[3*posicion+4] = normalTapa[1];
                             buffersSuperficie.bufferNormales[3*posicion+5] = normalTapa[2];
 
+                            buffersSuperficie.bufferBinormales[3*posicion] = binormalTapa[0];
+                            buffersSuperficie.bufferBinormales[3*posicion+1] = binormalTapa[1];
+                            buffersSuperficie.bufferBinormales[3*posicion+2] = binormalTapa[2];
+                            buffersSuperficie.bufferBinormales[3*posicion+3] = binormalTapa[0];
+                            buffersSuperficie.bufferBinormales[3*posicion+4] = binormalTapa[1];
+                            buffersSuperficie.bufferBinormales[3*posicion+5] = binormalTapa[2];
+
+                            buffersSuperficie.bufferTangentes[3*posicion] = tangenteTapa[0];
+                            buffersSuperficie.bufferTangentes[3*posicion+1] = tangenteTapa[1];
+                            buffersSuperficie.bufferTangentes[3*posicion+2] = tangenteTapa[2];
+                            buffersSuperficie.bufferTangentes[3*posicion+3] = tangenteTapa[0];
+                            buffersSuperficie.bufferTangentes[3*posicion+4] = tangenteTapa[1];
+                            buffersSuperficie.bufferTangentes[3*posicion+5] = tangenteTapa[2];
+
                             buffersSuperficie.bufferUV[3*posicion] = bufferUVAux.bufferUVCentro[3*i];
                             buffersSuperficie.bufferUV[3*posicion+1] = bufferUVAux.bufferUVCentro[3*i+1];
                             buffersSuperficie.bufferUV[3*posicion+2] = bufferUVAux.bufferUVCentro[3*i+2];
@@ -2305,9 +2593,13 @@
                             posicion += 3*this.nivel.cantidadPuntosFinal;
                         }
                         normalTapa = vec3.fromValues(-1*this.recorrido.binormal[0],-1*this.recorrido.binormal[1],-1*this.recorrido.binormal[2]);
+                        binormalTapa = vec3.fromValues(-1*this.recorrido.tangente[0],-1*this.recorrido.tangente[1],-1*this.recorrido.tangente[2]);
+                        tangenteTapa = vec3.fromValues(-1*this.recorrido.normal[0],-1*this.recorrido.normal[1],-1*this.recorrido.normal[2]);
                         if(this.invertirNormalTapas)
                         {
                             vec3.scale(normalTapa,normalTapa,-1);
+                            vec3.scale(binormalTapa,binormalTapa,-1);
+                            vec3.scale(tangenteTapa,tangenteTapa,-1);
                         }
                         for(var i=0; i< puntosTapa; i++)
                         {
@@ -2333,29 +2625,54 @@
                             buffersSuperficie.bufferNormales[3*posicion+2] = normalTapa[2];
                             buffersSuperficie.bufferNormales[3*posicion+3] = normalTapa[0];
                             buffersSuperficie.bufferNormales[3*posicion+4] = normalTapa[1];
-                            buffersSuperficie.bufferNormales[3*posicion+5] = normalTapa[2];
+                            buffersSuperficie.bufferNormales[3*posicion+5] = normalTapa[2];                            
 
-                            buffersSuperficie.bufferUV[posicion] = bufferUVAux.bufferUVBorde[3*i];
-                            buffersSuperficie.bufferUV[posicion+1] = bufferUVAux.bufferUVBorde[3*i+1];
-                            buffersSuperficie.bufferUV[posicion+2] = bufferUVAux.bufferUVBorde[3*i+2];
-                            buffersSuperficie.bufferUV[posicion+3] = bufferUVAux.bufferUVCentro[3*i];
-                            buffersSuperficie.bufferUV[posicion+4] = bufferUVAux.bufferUVCentro[3*i+1];
-                            buffersSuperficie.bufferUV[posicion+5] = bufferUVAux.bufferUVCentro[3*i+2];
+                            buffersSuperficie.bufferBinormales[3*posicion] = binormalTapa[0];
+                            buffersSuperficie.bufferBinormales[3*posicion+1] = binormalTapa[1];
+                            buffersSuperficie.bufferBinormales[3*posicion+2] = binormalTapa[2];
+                            buffersSuperficie.bufferBinormales[3*posicion+3] = binormalTapa[0];
+                            buffersSuperficie.bufferBinormales[3*posicion+4] = binormalTapa[1];
+                            buffersSuperficie.bufferBinormales[3*posicion+5] = binormalTapa[2];
+
+                            buffersSuperficie.bufferTangentes[3*posicion] = tangenteTapa[0];
+                            buffersSuperficie.bufferTangentes[3*posicion+1] = tangenteTapa[1];
+                            buffersSuperficie.bufferTangentes[3*posicion+2] = tangenteTapa[2];
+                            buffersSuperficie.bufferTangentes[3*posicion+3] = tangenteTapa[0];
+                            buffersSuperficie.bufferTangentes[3*posicion+4] = tangenteTapa[1];
+                            buffersSuperficie.bufferTangentes[3*posicion+5] = tangenteTapa[2];
+
+                            buffersSuperficie.bufferUV[3*posicion] = bufferUVAux.bufferUVBorde[3*i];
+                            buffersSuperficie.bufferUV[3*posicion+1] = bufferUVAux.bufferUVBorde[3*i+1];
+                            buffersSuperficie.bufferUV[3*posicion+2] = bufferUVAux.bufferUVBorde[3*i+2];
+                            buffersSuperficie.bufferUV[3*posicion+3] = bufferUVAux.bufferUVCentro[3*i];
+                            buffersSuperficie.bufferUV[3*posicion+4] = bufferUVAux.bufferUVCentro[3*i+1];
+                            buffersSuperficie.bufferUV[3*posicion+5] = bufferUVAux.bufferUVCentro[3*i+2];
                     
                             posicion += this.nivel.cantidadPuntosFinal;
                         }
                     }
+                    //console.log(buffersSuperficie.bufferPuntos);
+                    //console.log(buffersSuperficie.bufferNormales);
+                    //console.log(buffersSuperficie.bufferBinormales);
+                    //console.log(buffersSuperficie.bufferTangentes);
                     
                     var bufferIndice = this.obtenerIndexBuffer(this.recorrido.cantidadPuntosFinal,this.nivel.cantidadPuntosFinal);
 
                     var supBarridoVerticeBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoVerticeBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffersSuperficie.bufferPuntos), gl.STATIC_DRAW);    
-                
 
                     var supBarridoNormalBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoNormalBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffersSuperficie.bufferNormales), gl.STATIC_DRAW);
+
+                    var supBarridoBinormalBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoBinormalBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffersSuperficie.bufferBinormales), gl.STATIC_DRAW);
+
+                    var supBarridoTangentBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoTangentBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffersSuperficie.bufferTangentes), gl.STATIC_DRAW);
 
                     var supBarridoUVBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ARRAY_BUFFER, supBarridoUVBuffer);
@@ -2369,6 +2686,8 @@
                     return {
                         supBarridoVerticeBuffer,
                         supBarridoNormalBuffer,
+                        supBarridoTangentBuffer,
+                        supBarridoBinormalBuffer,
                         supBarridoUVBuffer,
                         supBarridoIndexBuffer
                     };
@@ -2563,7 +2882,7 @@
                 {
                     var circulo = new ArcoCircunferencia(this.radio, this.cantPuntosArco, 180, 90);
                     this.nivel = circulo.crear();
-                    circulo = new ArcoCircunferencia(0, this.cantArcos);
+                    circulo = new ArcoCircunferencia(this.radio/1000, this.cantArcos);
                     this.recorrido = circulo.crear();
                 }
                 //  Métodos Prúblicos
@@ -2603,6 +2922,7 @@
             var camara1 = new Camara();
             var camara2 = new Camara();
             var camara3 = new Camara();
+            var camara4 = new Camara();
             var camaraElegida = camara1;
             const pasoRadioC1 = 0.2;
             const pasoAnguloC1 = 0.01;
@@ -2644,10 +2964,11 @@
             const pasoDistaciaCapsula = 0.1;
             var capsula;
 
-            const DELTA_TRASLACION = 0.05;        // velocidad de traslacion 
-            const DELTA_ROTACION = 0.02;         // velocidad de rotacion
+            const DELTA_TRASLACION = 0.1;        // velocidad de traslacion 
+            const DELTA_ROTACION = 0.05;         // velocidad de rotacion
             const FACTOR_INERCIA = 0.01;
-
+            
+            var controlCapsula = new AccionCapsula();
             // luces
             var luces = new Luces();
 
@@ -2785,21 +3106,25 @@
             */
             // para generar el anillo
 
-            function generarColumaSoporte(bufferBarraLatera,bufferBarraCruzada, longitud, ancho,longitudBarraCruzada,perimetrobase)
+            function generarColumaSoporte(bufferBarraLatera,bufferBarraCruzada, longitud, ancho,longitudBarraCruzada,perimetrobase, perimetroCruzado)
             {
                 var columaSoporte = new Objeto3D();
                 var objetoAuxiliar = new Objeto3D();
 
                 //color
+                var relacion = longitud/perimetrobase;
+                var escala = 0.25;
                 var color = new ColorConReflexion();
                 color.setColorEspecular(1.0,1.0,1.0);
-                color.setColorAmbiente(1.0,1.0,1.0);
-                color.setColorDifuso(1.0,1.0,1.0);
+                //color.setColorAmbiente(1.0,1.0,1.0);
+                //color.setColorDifuso(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.3,0.6,1.0);
                 color.setGlossiness(100);
                 color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
+                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png","textures/MetalWeave03_1K_Normal.png",0.0,escala,0.0,relacion*escala);
+                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png","textures/MetalWeave03_1K_Normal.png",0.0,0.0,0.0,0.0*0.0);
                 color.setVertexShader(vertexShader[1]);
-                color.setFragmentShader(fragmentShader[4]);
+                color.setFragmentShader(fragmentShader[3]);
 
                 objetoAuxiliar.setGeometria(bufferBarraLatera);
                 objetoAuxiliar.setPosicion(longitud/2,ancho/2,0);
@@ -2814,6 +3139,17 @@
                 var alturaBarraCruzada = Math.cos(rotacionBarraCruzada)*longitudBarraCruzada;
                 var cantidadBarrasCruzadas = Math.floor(longitud/alturaBarraCruzada);
                 var posicion = (longitud-cantidadBarrasCruzadas*alturaBarraCruzada)/2+alturaBarraCruzada/2;
+
+                relacion = longitudBarraCruzada/perimetroCruzado;
+                color = new ColorConReflexion();
+                color.setColorEspecular(1.0,1.0,1.0);
+                color.setFactoresLuminosidad(0.3,0.6,1.0);
+                color.setGlossiness(100);
+                color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
+                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png","textures/MetalWeave03_1K_Normal.png",0.0,escala,0.0,relacion*escala);
+                color.agregarTexturaConParametrosUV("textures/MetalWeave03_1K_AO.png","textures/MetalWeave03_1K_Normal.png",0.0,0.0,0.0,0.0*0.0);
+                color.setVertexShader(vertexShader[1]);
+                color.setFragmentShader(fragmentShader[3]);
 
                 for(var i = 0; i < cantidadBarrasCruzadas; i++)
                 {
@@ -2871,6 +3207,7 @@
                 var recorrido = figura.crear();
 
                 var superficieAux = new Superficie();
+                //superficieAux.setTapaFinal(false);
                 superficieAux.setNivel(nivel);
                 superficieAux.setRecorrido(recorrido);
                 var superficie = superficieAux.crearSuperficieBarrido();
@@ -2897,6 +3234,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.2,0.6,1.0);
                 color.setGlossiness(10);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
 
@@ -2996,8 +3335,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.3,0.6,1.0);
                 color.setGlossiness(100);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave01_1K_Height.png",0.0,factor,0.0,relacion*factor);
-                color.agregarTexturaConParametrosUV("textures/MetalWeave01_1K_Height.png",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("textures/MetalWeave01_1K_Height.png","textures/MetalWeave01_1K_Normal.png",0.0,factor,0.0,relacion*factor);
+                color.agregarTexturaConParametrosUV("textures/MetalWeave01_1K_Height.png","textures/MetalWeave01_1K_Normal.png",0.0,0.0,0.0,0.0);
                 color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[3]);
@@ -3011,13 +3350,13 @@
                 var prisma = new Prisma(anchoLateral,anchoLateral,radio);
                 superficie = prisma.crearSuperficieBarrido();
                 //superficie = generarPrisma(anchoLateral,anchoLateral,radio);
-                //var cilindro = new Cilindro(radioviga,largoCrucado,cantPuntosCruzado); 
-                //var superficie2 = cilindro.crearSuperficieBarrido();
-                prisma = new Prisma(2*radioviga,2*radioviga,largoCrucado);
-                superficie2 = prisma.crearSuperficieBarrido();
+                var cilindro = new Cilindro(radioviga,largoCrucado,cantPuntosCruzado); 
+                var superficie2 = cilindro.crearSuperficieBarrido();
+                //prisma = new Prisma(2*radioviga,2*radioviga,largoCrucado);
+                //superficie2 = prisma.crearSuperficieBarrido();
                 //var superficie2 = generarCilindro(radioviga,largoCrucado,cantPuntosCruzado);
                 
-                var superficie3 = generarModulos(anchoModulo, altoModulo, radio, 360/(2*cantidadModulos));
+                var superficie3 = generarModulos(anchoModulo, altoModulo, radio, 360/(2*cantidadModulos),cantPuntosAnilloR/(2*cantidadModulos));
 
                 var anguloInicial = 0;
                 var anguloPaso = Math.PI*2/cantidadModulos;
@@ -3027,14 +3366,15 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.5,1.0,1.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/modulo.jpg");
-                color.agregarTexturaConParametrosUV("maps/modulo.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/modulo.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/modulo.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
+                //color.agregarTexturaConParametrosUV("maps//uvgrid.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
                 for(var i = 0; i < cantidadModulos; i++)
                 {
-                    hijo = generarColumaSoporte(superficie,superficie2,radio,anchoViga,largoCrucado,4*anchoLateral);
+                    hijo = generarColumaSoporte(superficie,superficie2,radio,anchoViga,largoCrucado,4*anchoLateral,2*Math.PI*radioviga);
                     hijo.setRotacion(0,0,1,anguloInicial);
                     objeto.agregarHijo(hijo);
                     hijo = new Objeto3D();
@@ -3057,6 +3397,8 @@
                 color.setColorDifuso(1.0,0.5,0.0);
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.2,0.4,1.0);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setGlossiness(10);
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
@@ -3071,8 +3413,10 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.5,1.0,1.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/paneles_solares.jpg",0.0357);
-                color.agregarTexturaConParametrosUV("maps/paneles_solares.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/paneles_solares.jpg","maps/normalGeneral.jpg",0.0357);
+                color.agregarTexturaConParametrosUV("maps/paneles_solares.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
+                //color.agregarTexturaConParametrosUV("maps//uvgrid.jpg",0.0,0.2,0.0,0.1);
+                //color.agregarTexturaConParametrosUV("maps//uvgrid.jpg",0.01,0.0,0.01,0.0);
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3124,6 +3468,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.2,0.4,1.0);
                 color.setGlossiness(10);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
 
@@ -3233,20 +3579,20 @@
                 const gradoBezierMCC = 1;
                 const puntosControlMCC = 
                 [
-                    0.0,-largoMCC/2, 0.0,
-                    radioMCC-recorteEsquina,-largoMCC/2,0.0,
+                    //0.0,-largoMCC/2, 0.0,
+                    //radioMCC-recorteEsquina,-largoMCC/2,0.0,
 
-                    radioMCC-recorteEsquina,-largoMCC/2,0.0,
-                    radioMCC,-largoMCC/2+recorteEsquina,0.0,
+                    recorteEsquina-radioMCC,largoMCC/2,0.0,
+                    -radioMCC,largoMCC/2-recorteEsquina,0.0,
 
-                    radioMCC,-largoMCC/2+recorteEsquina,0.0,
-                    radioMCC,largoMCC/2-recorteEsquina,0.0,
+                    -radioMCC,largoMCC/2-recorteEsquina,0.0,
+                    -radioMCC,-largoMCC/2+recorteEsquina,0.0,
 
-                    radioMCC,largoMCC/2-recorteEsquina,0.0,
-                    radioMCC-recorteEsquina,largoMCC/2,0.0,
+                    -radioMCC,-largoMCC/2+recorteEsquina,0.0,
+                    -radioMCC+recorteEsquina,-largoMCC/2,0.0,
 
-                    radioMCC-recorteEsquina,largoMCC/2,0.0,
-                    0.0,largoMCC/2,0.0
+                    //radioMCC-recorteEsquina,largoMCC/2,0.0,
+                    //0.0,largoMCC/2,0.0
                 ];
 
                 var objeto = new Objeto3D();
@@ -3270,6 +3616,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.1,0.2,1.0);
                 color.setGlossiness(10);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
 
@@ -3289,14 +3637,14 @@
                 figura = new Bezier2D(10, gradoBezierMCC);
                 figura.setPuntosDeControl(puntosControlMCC);
                 nivel = figura.crear();
-                figura = new ArcoCircunferencia(0,100);
+                figura = new ArcoCircunferencia(0.0001,100);
                 recorrido = figura.crear();
 
                 superficieAux = new Superficie();
                 superficieAux.setNivel(nivel);
                 superficieAux.setRecorrido(recorrido);
-                superficieAux.setTapaFinal(false);
-                superficieAux.setTapaInicial(false);
+                //superficieAux.setTapaFinal(false);
+                //superficieAux.setTapaInicial(false);
                 superficie = superficieAux.crearSuperficieRevolucion();
                 //superficie = superficieRevolucionCompleta(nivel,recorrido,false,false,false);
 
@@ -3304,8 +3652,9 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.5,1.0,1.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/modulo-cilindrico.jpg");
-                color.agregarTexturaConParametrosUV("maps/modulo-cilindrico.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/modulo-cilindrico.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/modulo-cilindrico.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
+                //color.agregarTexturaConParametrosUV("maps/modulo-cilindrico.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3320,15 +3669,16 @@
                 hijo.setPosicion(0.0,0.0,-(largoMCC+profundidadMB));
                 objeto.agregarHijo(hijo);
 
-                figura = new ArcoCircunferencia(radioMCE,50,angulo,-angulo/2);
+                figura = new ArcoCircunferencia(radioMCE,50,angulo,angulo);
                 nivel = figura.crear();
-                figura = new ArcoCircunferencia(0,100);
+                figura = new ArcoCircunferencia(0.0001,100);
                 recorrido = figura.crear();
 
                 superficieAux = new Superficie();
                 superficieAux.setNivel(nivel);
                 superficieAux.setRecorrido(recorrido);
-                superficieAux.setInvertirNormalTapas(invertirNormal);
+                //superficieAux.setTapaFinal(false);
+                //superficieAux.setInvertirNormalTapas(invertirNormal);
                 superficie = superficieAux.crearSuperficieRevolucion();
                 //superficie = superficieRevolucionCompleta(nivel,recorrido,invertirNormal);
 
@@ -3336,8 +3686,10 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.5,1.0,1.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/modulo-esferico.jpg");
-                color.agregarTexturaConParametrosUV("maps/modulo-esferico.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/modulo-esferico.jpg","maps/normalGeneral.jpg");
+                //color.agregarTexturaConParametrosUV("maps/modulo-esferico.jpg","maps/normalGeneral.jpg");
+                //color.agregarTexturaConParametrosUV("maps//uvgrid.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/modulo-esferico.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3391,8 +3743,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(1.0,0.0,0.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/tierra.jpg");
-                color.agregarTexturaConParametrosUV("maps/tierra.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/tierra.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/tierra.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3418,8 +3770,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(1.0,0.0,0.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/luna.jpg");
-                color.agregarTexturaConParametrosUV("maps/luna.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/luna.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/luna.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3444,8 +3796,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(1.0,0.0,0.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/sun.jpg",0.0,4.0);
-                color.agregarTexturaConParametrosUV("maps/sun.jpg");
+                color.agregarTexturaConParametrosUV("maps/sun.jpg","maps/normalGeneral.jpg",0.0,4.0);
+                color.agregarTexturaConParametrosUV("maps/sun.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[1]);
 
@@ -3527,8 +3879,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.5,1.0,1.0);
                 color.setGlossiness(10);
-                color.agregarTexturaConParametrosUV("maps/shiphull.jpg");
-                color.agregarTexturaConParametrosUV("maps/shiphull.jpg",0.0,0.0,0.0,0.0);
+                color.agregarTexturaConParametrosUV("maps/shiphull.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/shiphull.jpg","maps/normalGeneral.jpg",0.0,0.0,0.0,0.0);
                 color.agregarMapaDeReflexion("maps/earth_refmap2.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[3]);
@@ -3558,6 +3910,8 @@
                 color.setColorEspecular(1.0,1.0,1.0);
                 color.setFactoresLuminosidad(0.1,0.2,1.0);
                 color.setGlossiness(10);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
 
@@ -3585,6 +3939,8 @@
                 color.setColorEspecular(0.0,0.0,0.0);
                 color.setFactoresLuminosidad(1.0,1.0,1.0);
                 color.setGlossiness(1);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
                 superficieAux = new Cilindro(0.01,0.02);
@@ -3608,6 +3964,8 @@
                 color.setColorEspecular(0.0,0.0,0.0);
                 color.setFactoresLuminosidad(1.0,1.0,1.0);
                 color.setGlossiness(1);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
                 hijo = new Objeto3D();
@@ -3628,6 +3986,8 @@
                 color.setColorEspecular(0.0,0.0,0.0);
                 color.setFactoresLuminosidad(1.0,1.0,1.0);
                 color.setGlossiness(1);
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/normalGeneral.jpg","maps/normalGeneral.jpg");
                 color.setVertexShader(vertexShader[1]);
                 color.setFragmentShader(fragmentShader[2]);
 
@@ -3707,6 +4067,44 @@
             }
 
             // inicializar objetos
+            // prueba
+            function generarPrueba()
+            {
+                figura = new ArcoCircunferencia(1.0,50,120,120);
+                nivel = figura.crear();
+                figura = new ArcoCircunferencia(0.0001,100);
+                recorrido = figura.crear();
+
+                superficieAux = new Superficie();
+                superficieAux.setNivel(nivel);
+                superficieAux.setRecorrido(recorrido);
+                //var superficieAux = new Prisma(3.0,3.0,3.0);
+                //var superficieAux = new Cilindro(1.5,3.0);
+                var superficie = superficieAux.crearSuperficieRevolucion();
+
+
+                var color = new Color();
+                var escala = 1;
+                color.setColorEspecular(1.0,1.0,1.0);
+                color.setFactoresLuminosidad(0.3,0.6,1.0);
+                color.setGlossiness(100);
+                //color.agregarTexturaConParametrosUV("textures/SeasideRocks01_1K_BaseColor.png","textures/SeasideRocks01_1K_Normal.png",0.0,escala*4.0,0.0,escala);
+                //color.agregarTexturaConParametrosUV("textures/SeasideRocks01_1K_BaseColor.png","textures/SeasideRocks01_1K_Normal.png",0.0,escala,0.0,escala);
+                color.agregarTexturaConParametrosUV("maps/uvgrid.jpg","maps/normalGeneral.jpg");
+                color.agregarTexturaConParametrosUV("maps/uvgrid.jpg","maps/normalGeneral.jpg");
+                color.setVertexShader(vertexShader[1]);
+                color.setFragmentShader(fragmentShader[1]);
+
+
+                var objeto = new Objeto3D();
+                objeto.agregarHijo(camara4);
+                objeto.setGeometria(superficie);
+                objeto.setColor(color);
+                objeto.setPosicion(-5.0,0.0,0.0);
+                //objeto.setRotacion(0.0,1.0,0.0,Math.PI/2);
+
+                return objeto;
+            }
             
             function inicializarObjetos()
             {
@@ -3762,6 +4160,9 @@
                 controller.name("Ángulo de los Paneles Solares");
                 controller = gui.add(variablesGUI,"velocidadAnillo",-10,10);
                 controller.name("Velocidad de Rotación Anillo");
+
+                //hijo2 = generarPrueba();
+                //objetos3D.agregarHijo(hijo2);
             }
 
             /*
@@ -3799,6 +4200,8 @@
                 objetos3D.dibujar(viewMatrix);
                 if(isMouseDown)
                     actualizarOrientacion();
+                //actualizarMovimientoxCapsula();
+
                 viewMatrix = camaraElegida.getMatrizVista();
 
                 //rotate_angle += 0.01;
@@ -3865,8 +4268,10 @@
             $('body').mouseup(function(event){
                 isMouseDown = false;		
             });
-
-            $('body').on("keydown",function(event){
+            
+            /*
+            $('body').on("keydown",function(event)
+            {
                 //console.log(event);
                 var radioCamara;
                 switch(event.key){
@@ -3885,6 +4290,113 @@
                         pasoRadio = pasoRadioC3;
                         pasoAngulo = pasoAnguloC3;
                     break;  
+                    case "z":
+                        radioCamara = camaraElegida.getRadio();
+                        radioCamara -= pasoRadio;
+                        if(radioCamara< 0)
+                            radioCamara = 0;
+                        camaraElegida.setRadio(radioCamara);
+                    break;
+                    case "x":
+                        radioCamara = camaraElegida.getRadio();
+                        radioCamara += pasoRadio;
+                        camaraElegida.setRadio(radioCamara);
+                    break;  
+
+                    case "w":
+                    controlCapsula.setFactorAdelante(1);
+                    break; 
+                    case "s":
+                    controlCapsula.setFactorAdelante(-1);
+                    break;    
+                    case "a":
+                    controlCapsula.setFactorIzquierda(1);
+                    break; 
+                    case "d":
+                    controlCapsula.setFactorIzquierda(-1);
+                    break;    
+                    case "q":
+                    controlCapsula.setFactorArriba(1);
+                    break; 
+                    case "e":
+                    controlCapsula.setFactorArriba(-1);
+                    break;        
+
+                    case "j":
+                    controlCapsula.setFactorGuiniada(1);
+                    break; 
+                    case "l":
+                    controlCapsula.setFactorGuiniada(-1);
+                    break;  
+                    case "i":
+                    controlCapsula.setFactorCabeceo(1)
+                    break; 
+                    case "k":
+                    controlCapsula.setFactorCabeceo(-1);
+                    break;  
+                }
+            });
+            */
+
+            /*
+            $('body').on("keyup",function(event){
+                //console.log(event);
+                switch(event.key){
+
+                    case "w":
+                    controlCapsula.setFactorAdelante(0);
+                    break; 
+                    case "s":
+                    controlCapsula.setFactorAdelante(0);
+                    break;    
+                    case "a":
+                    controlCapsula.setFactorIzquierda(0);
+                    break; 
+                    case "d":
+                    controlCapsula.setFactorIzquierda(0);
+                    break;    
+                    case "q":
+                    controlCapsula.setFactorArriba(0);
+                    break; 
+                    case "e":
+                    controlCapsula.setFactorArriba(0);
+                    break;         
+                    
+                    case "j":
+                    controlCapsula.setFactorGuiniada(0);
+                    break; 
+                    case "l":
+                    controlCapsula.setFactorGuiniada(0);
+                    break;  
+                    case "i":
+                    controlCapsula.setFactorCabeceo(0)
+                    break; 
+                    case "k":
+                    controlCapsula.setFactorCabeceo(0);
+                    break;  
+                }
+            });    
+            */
+            
+            $('body').on("keydown",function(event){
+                //console.log(event);
+                var radioCamara;
+                switch(event.key){
+                    case "1":
+                        camaraElegida = camara1;
+                        pasoRadio = pasoRadioC1;
+                        pasoAngulo = pasoAnguloC1;
+                    break;
+                    case "2":
+                        camaraElegida = camara2;
+                        pasoRadio = pasoRadioC1;
+                        pasoAngulo = pasoAnguloC1;
+                    break;
+                    case "3":
+                        camaraElegida = camara3;
+                        pasoRadio = pasoRadioC3;
+                        pasoAngulo = pasoAnguloC3;
+                    break;
                     case "z":
                         radioCamara = camaraElegida.getRadio();
                         radioCamara -= pasoRadio;
@@ -3940,6 +4452,7 @@
                 }
                     
             });    
+            
             $('body').on("keyup",function(event){
                 //console.log(event);
                 switch(event.key){
@@ -3981,7 +4494,7 @@
 
                     
             });    
-
+            
             function actualizarOrientacion()
             {
                 var deltaX=0;
@@ -4002,6 +4515,14 @@
                 camaraElegida.setTheta(theta);
             }
 
+            function actualizarMovimientoxCapsula()
+            {
+                capsula.moverHaciaAdelante(controlCapsula.getDesplazamientoAdelante());
+                capsula.moverHaciaLaIzquierda(controlCapsula.getDesplazamientoIzquierda());
+                capsula.moverHaciaArriba(controlCapsula.getDesplazamientoArriba());
+                capsula.girarAnguloGuiniada(controlCapsula.getRotacionGuiniada());
+                capsula.girarAnguloCabeceo(controlCapsula.getRotacionCabeceo());
+            }
             window.onload=initWebGL;
 
         </script>
